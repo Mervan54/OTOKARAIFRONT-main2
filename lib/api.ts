@@ -109,19 +109,13 @@ export async function getCsvFiles(): Promise<string[]> {
 // Chatbota soru gönder
 export async function sendChatMessage(question: string, fileName?: string): Promise<string> {
   try {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 saniye timeout
     await fetch(`${API_BASE}/index-all-csv`, { 
       method: "POST",
-      signal: controller.signal
     })
-    clearTimeout(timeoutId)
   } catch {
-    console.warn("Index failed or timed out, continuing...")
+    console.warn("Index failed, continuing...")
   }
 
- 
-  
   const response = await fetch(`${API_BASE}/chatbot-ask`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -131,19 +125,19 @@ export async function sendChatMessage(question: string, fileName?: string): Prom
     }),
   })
   
-  if (!response.ok) throw new Error("Chatbot yanıt veremedi")
+  if (!response.ok) throw new Error("Chatbot yan?t veremedi")
   
- const text = await response.text()
+  const text = await response.text()
 
+  try {
+    const data = JSON.parse(text)
+    if (typeof data === 'string') return data
+    return data.answer ?? data.response ?? data.result ?? data.message ?? text
+  } catch {
+    return text
+  }
+}
 
-try {
-  const data = JSON.parse(text)
-  if (typeof data === 'string') return data
-  return data.answer ?? data.response ?? data.result ?? data.message ?? text
-} catch {
-  return text
-}
-}
 
 // AI Insights - direktörlük verilerinden üret
 export async function getAIInsights(directorates: any[]): Promise<any[]> {
