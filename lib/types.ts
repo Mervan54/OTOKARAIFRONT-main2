@@ -5,6 +5,7 @@ export interface Department {
   goals: string[]
   skills: string[]
   responsibilities: string[]
+  adSoyadlar?: string[]
 }
 
 export interface Directorate {
@@ -28,6 +29,7 @@ export interface UniqueTask {
   id: string
   name: string
   departments: string[]
+  persons: string[]
   frequency: number
   solutionType: SolutionType
   automationRate: number

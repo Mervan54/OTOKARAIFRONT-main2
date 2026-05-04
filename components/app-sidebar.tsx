@@ -2,13 +2,15 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Building2, ListTodo, MessageSquare } from "lucide-react"
+import { LayoutDashboard, Building2, ListTodo, MessageSquare, BarChart2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navigation = [
-  { name: "Genel Bakis", href: "/", icon: LayoutDashboard },
-  { name: "Direktorlukler", href: "/directorates", icon: Building2 },
-  { name: "Benzersiz Gorevler", href: "/tasks", icon: ListTodo },
+  { name: "Genel Bakış", href: "/", icon: LayoutDashboard },
+  { name: "Direktörlükler", href: "/directorates", icon: Building2 },
+  { name: "Görevler", href: "/tasks", icon: ListTodo },
+  { name: "Raporlar ve İstatistikler", href: "/reports", icon: BarChart2 },
+
   { name: "Yapay Zeka Asistan", href: "/chatbot", icon: MessageSquare },
 ]
 

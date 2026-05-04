@@ -1,3 +1,4 @@
+//const API_BASE = "http://localhost:5091/api/Analysis"
 const API_BASE = process.env.NEXT_PUBLIC_API_URL!
 
 
@@ -19,6 +20,7 @@ export async function getDirectorateSummary() {
       goals: dept.amaclar,
       skills: dept.yetkinlikler,
       responsibilities: dept.anaSorumluluklar,
+      adSoyadlar: dept.adSoyadlar ?? [],
     })),
   }))
 }
@@ -29,46 +31,68 @@ export async function getAIAnalysis(directorate: string) {
   if (!response.ok) throw new Error("AI analizi alınamadı")
   const data = await response.json()
 
+  const analysis = data.analysis
+
   return {
-    directorate: data.directortate,
-    tasks: (data.tasks ?? []).map((t: any) => ({
-      task: t.task,
-      departments: t.departments ?? [],
-      bestSolution: t.bestSolution ?? "Other",
-      automationRate: t.automationRate ?? 0,
-      recommendation: t.recommendation ?? "",
-      similarProjectName: t.similarProjectName ?? "",
-      similarProjectLink: t.similarProjectLink ?? "",
-    })),
+    directorate: data.directorate ?? directorate,
+    tasks: analysis ? [{
+      task: analysis.task ?? "",
+      departments: [],
+      bestSolution: analysis.bestSolution ?? "Other",
+      automationRate: analysis.automationRate ?? 0,
+      recommendation: analysis.recommendation ?? "",
+      projectIdea: analysis.projectIdea ?? "",
+      similarProjectName: analysis.similarProjectName ?? "",
+      similarProjectLink: analysis.similarProjectLink ?? "",
+      responsiblePeople: analysis.responsiblePeople ?? [],
+    }] : [],
   }
 }
 
 // Unique görevler
 export async function getUniqueTasks() {
-  const response = await fetch(`${API_BASE}/summary`)
+  const response = await fetch(`${API_BASE}/raw`)
   if (!response.ok) throw new Error("Görev verileri alınamadı")
   const data = await response.json()
 
-  const taskMap = new Map<string, { name: string; departments: string[] }>()
+  const taskMap = new Map<string, { name: string; departments: string[]; persons: string[] }>()
 
-  data.forEach((dir: any) => {
-    dir.mudurlukler?.forEach((dept: any) => {
-      dept.anaSorumluluklar?.forEach((task: string) => {
-        const key = task.trim().toLowerCase()
-        if (taskMap.has(key)) {
-          taskMap.get(key)!.departments.push(dept.mudurluk)
-        } else {
-          taskMap.set(key, { name: task.trim(), departments: [dept.mudurluk] })
-        }
+  data.forEach((record: any) => {
+    if (!record.anaSorumluluk) return
+
+    const key = record.anaSorumluluk
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .replace(/[.,;:!?]/g, "")
+      .replace(/\r\n|\r|\n/g, " ")
+
+    const person = record.ad_soyad?.trim() ?? ""
+    const dept = record.mudurluk?.trim() ?? ""
+
+    if (taskMap.has(key)) {
+      const existing = taskMap.get(key)!
+      if (person && !existing.persons.includes(person)) {
+        existing.persons.push(person)
+      }
+      if (dept && !existing.departments.includes(dept)) {
+        existing.departments.push(dept)
+      }
+    } else {
+      taskMap.set(key, {
+        name: record.anaSorumluluk.trim(),
+        departments: dept ? [dept] : [],
+        persons: person ? [person] : [],
       })
-    })
+    }
   })
 
   return Array.from(taskMap.values()).map((value, i) => ({
     id: `task-${i + 1}`,
     name: value.name,
-    departments: [...new Set(value.departments)],
-    frequency: value.departments.length,
+    departments: value.departments,
+    persons: value.persons,
+    frequency: value.persons.length,
     solutionType: "Other" as const,
     automationRate: 0,
     recommendation: "",
@@ -83,22 +107,44 @@ export async function getCsvFiles(): Promise<string[]> {
 }
 
 // Chatbota soru gönder
-export async function sendChatMessage(question: string, fileName: string): Promise<string> {
+export async function sendChatMessage(question: string, fileName?: string): Promise<string> {
+  try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 saniye timeout
+    await fetch(`${API_BASE}/index-all-csv`, { 
+      method: "POST",
+      signal: controller.signal
+    })
+    clearTimeout(timeoutId)
+  } catch {
+    console.warn("Index failed or timed out, continuing...")
+  }
+
+ 
+  
   const response = await fetch(`${API_BASE}/chatbot-ask`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question, fileName }),
+    body: JSON.stringify({ 
+      question, 
+      fileName: fileName ?? null 
+    }),
   })
-  console.log("Response status:", response.status)
   
   if (!response.ok) throw new Error("Chatbot yanıt veremedi")
-  const data = await response.json()
-  console.log("API response:",data)
-  return data.answer??""
+  
+ const text = await response.text()
+
+
+try {
+  const data = JSON.parse(text)
+  if (typeof data === 'string') return data
+  return data.answer ?? data.response ?? data.result ?? data.message ?? text
+} catch {
+  return text
+}
 }
 
- 
- 
 // AI Insights - direktörlük verilerinden üret
 export async function getAIInsights(directorates: any[]): Promise<any[]> {
   if (directorates.length === 0) return []
@@ -107,7 +153,9 @@ export async function getAIInsights(directorates: any[]): Promise<any[]> {
   const busiestDirectorate = sortedByRecords[0]
 
   const allDepartments = directorates.flatMap((d: any) => d.departments)
-  const sortedDepts = [...allDepartments].sort((a: any, b: any) => b.taskCount - a.taskCount)
+  const sortedDepts = [...allDepartments].sort((a: any, b: any) =>
+    new Set(b.adSoyadlar ?? []).size - new Set(a.adSoyadlar ?? []).size
+  )
   const busiestDept = sortedDepts[0]
 
   return [
@@ -115,14 +163,14 @@ export async function getAIInsights(directorates: any[]): Promise<any[]> {
       id: "insight-1",
       title: "En Yogun Direktorluk",
       value: busiestDirectorate.name,
-      description: `${busiestDirectorate.totalRecords} kayit ile en fazla is yukune sahip`,
+      description: `${new Set(busiestDirectorate.departments.flatMap((d: any) => d.adSoyadlar ?? [])).size} kişi ile en fazla iş yüküne sahip`,
       type: "directorate",
     },
     {
       id: "insight-2",
-      title: "En Cok Gorev Alan Mudurluk",
+      title: "En Çok Görev Alan Müdürlük",
       value: busiestDept.name,
-      description: `${busiestDept.taskCount} gorev ile lider konumda`,
+      description: `${new Set(busiestDept.adSoyadlar ?? []).size} kişi ile lider konumda`,
       type: "department",
     },
     {
@@ -140,4 +188,58 @@ export async function getAIInsights(directorates: any[]): Promise<any[]> {
       type: "department",
     },
   ]
+}
+
+// Cümle bazlı görev analizi (Raporlar sayfası için)
+export async function getSentenceBasedTasks() {
+  const response = await fetch(`${API_BASE}/raw`)
+  if (!response.ok) throw new Error("Görev verileri alınamadı")
+  const data = await response.json()
+
+  const sentenceMap = new Map<string, { sentence: string; persons: string[]; departments: string[] }>()
+
+  data.forEach((record: any) => {
+    if (!record.anaSorumluluk) return
+
+    const person = record.ad_soyad?.trim() ?? ""
+    const dept = record.mudurluk?.trim() ?? ""
+
+    const sentences = record.anaSorumluluk
+      .split(/\d+\.\s+/)
+      .map((s: string) => s.trim().replace(/\.,\s*$/, "").trim())
+      .filter((s: string) => s.length > 10)
+
+    sentences.forEach((sentence: string) => {
+      const key = sentence.toLowerCase().replace(/\s+/g, " ").trim()
+      if (sentenceMap.has(key)) {
+        const existing = sentenceMap.get(key)!
+        if (person && !existing.persons.includes(person)) {
+          existing.persons.push(person)
+        }
+        if (dept && !existing.departments.includes(dept)) {
+          existing.departments.push(dept)
+        }
+      } else {
+        sentenceMap.set(key, {
+          sentence: sentence,
+          persons: person ? [person] : [],
+          departments: dept ? [dept] : [],
+        })
+      }
+    })
+  })
+
+  return Array.from(sentenceMap.values())
+    .filter(v => v.persons.length >= 2)
+    .sort((a, b) => b.persons.length - a.persons.length)
+    .map((value, i) => ({
+      id: `sentence-${i + 1}`,
+      name: value.sentence,
+      departments: value.departments,
+      persons: value.persons,
+      frequency: value.persons.length,
+      solutionType: "Other" as const,
+      automationRate: 0,
+      recommendation: "",
+    }))
 }

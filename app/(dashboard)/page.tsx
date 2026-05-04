@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { getDirectorateSummary, getAIInsights } from "@/lib/api"
-import type { Directorate, AIInsight } from "@/lib/types"
+import type { Directorate, AIInsight, Department} from "@/lib/types"
 import { cn } from "@/lib/utils"
 import {
   Bar,
@@ -36,6 +36,7 @@ export default function DashboardPage() {
     async function fetchData() {
       const data = await getDirectorateSummary()
       setDirectorates(data)
+       
       const insightData = await getAIInsights(data)
       setInsights(insightData)
       setLoading(false)
@@ -56,20 +57,33 @@ export default function DashboardPage() {
   }
 
   const totalDirectorates = directorates.length
-  const totalDepartments = directorates.reduce((acc, d) => acc + d.departmentCount, 0)
+  const totalDepartments = directorates.reduce((acc, d) => acc +d.departments.length,0)
   const totalTasks = directorates.reduce((acc, d) => acc + d.totalRecords, 0)
+  const totalPersons = directorates
+  .flatMap(d=> d.departments)
+  .flatMap(dept => dept.adSoyadlar ?? [])
+  .filter ((v,i,a)=> a.indexOf(v) === i)
+  .length
 
   const chartData = directorates.map((d) => ({
-    name: d.name.replace(" Direktorlugu", "").replace(" Direktörlüğü", ""),
-    value: d.totalRecords,
-  }))
+  name: d.name.replace(" Direktorlugu", "").replace(" Direktörlüğü", ""),
+  value: [...new Set(d.departments.flatMap(dept => dept.adSoyadlar ?? []))].length,
+}))
+
+const getUniquePersonCount = (directorate: Directorate) =>
+  new Set(directorate.departments.flatMap(d => d.adSoyadlar ?? [])).size
+
+const getDeptUniquePersonCount = (dept: Department) =>
+  new Set(dept.adSoyadlar ?? []).size
 
   const topDepartments = directorates
-    .flatMap((d) => d.departments)
-    .sort((a, b) => b.taskCount - a.taskCount)
-    .slice(0, 5)
+  .flatMap((d) => d.departments)
+  .sort((a, b) => 
+    new Set(b.adSoyadlar ?? []).size - new Set(a.adSoyadlar ?? []).size //Dıstınct halleri geliyor.
+  )
+  .slice(0, 5)
 
-  const maxDeptTasks = topDepartments[0]?.taskCount || 1
+  const maxDeptTasks = Math.max(...topDepartments.map(d => new Set(d.adSoyadlar ?? []).size), 1)
 
   if (loading) {
     return (
@@ -96,27 +110,27 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <AppHeader title="Genel Bakis" description="Kurumsal gorev analizinize genel bakis" />
+      <AppHeader title="Genel Bakış" description="Kurumsal Görev Analizinize Genel Bakış" />
       <div className="p-6">
         {/* Stats */}
         <div className="grid gap-6 md:grid-cols-3">
           <StatCard
-            title="Toplam Direktorluk"
+            title="Toplam Direktörlük"
             value={totalDirectorates}
             icon={Building2}
-            description="Aktif organizasyonel birimler"
+            description="Aktif Organizasyonel Birimler"
           />
           <StatCard
             title="Toplam Departman"
             value={totalDepartments}
             icon={Users}
-            description="Tum direktorluklerde"
+            description="Tüm direktörlüklerde"
           />
           <StatCard
-            title="Toplam Gorev"
-            value={totalTasks}
-            icon={ListTodo}
-            description="Tanimli gorev kayitlari"
+            title="Toplam Çalışan Kişi Sayısı"
+            value={totalPersons}
+            icon={Users}
+            description="Unique Çalışan Sayısı"
           />
         </div>
 
@@ -140,7 +154,7 @@ export default function DashboardPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <TrendingUp className="h-4 w-4" />
-                Direktorluk Bazli Gorev Dagilimi
+                Direktörlük Bazlı Görev Dağılımı
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -178,7 +192,7 @@ export default function DashboardPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <Users className="h-4 w-4" />
-                En Yogun 5 Mudurluk
+                En Yoğun 5 Müdürlük
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -192,12 +206,14 @@ export default function DashboardPage() {
                         </span>
                         <span className="font-medium">{dept.name}</span>
                       </span>
-                      <span className="text-muted-foreground">{dept.taskCount} gorev</span>
+                      <span className="text-muted-foreground">{new Set(dept.adSoyadlar ?? []).size} Kişi</span>
+                          
+                     
                     </div>
-                    <Progress 
-                      value={(dept.taskCount / maxDeptTasks) * 100} 
-                      className="h-2"
-                    />
+                   <Progress
+  value={(new Set(dept.adSoyadlar ?? []).size / maxDeptTasks) * 100}
+  className="h-2"
+/>
                   </div>
                 ))}
               </div>
@@ -208,16 +224,16 @@ export default function DashboardPage() {
         {/* Directorate Table */}
         <Card className="mt-6">
           <CardHeader>
-            <CardTitle>Direktorluk Ozeti</CardTitle>
+            <CardTitle>Direktörlük Özeti</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-12"></TableHead>
-                  <TableHead>Direktorluk Adi</TableHead>
-                  <TableHead className="text-right">Toplam Kayit</TableHead>
-                  <TableHead className="text-right">Departman Sayisi</TableHead>
+                  <TableHead>Direktörlük Adı</TableHead>
+                  <TableHead className="text-right">Toplam Kayıt</TableHead>
+                  <TableHead className="text-right">Departman Sayısı</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -242,7 +258,7 @@ export default function DashboardPage() {
                       </TableCell>
                       <TableCell className="font-medium">{directorate.name}</TableCell>
                       <TableCell className="text-right">
-                        <Badge variant="secondary">{directorate.totalRecords}</Badge>
+                        <Badge variant="secondary">{getUniquePersonCount(directorate)}</Badge>
                       </TableCell>
                       <TableCell className="text-right">{directorate.departmentCount}</TableCell>
                     </TableRow>
@@ -251,7 +267,7 @@ export default function DashboardPage() {
                         <TableCell colSpan={4} className="bg-muted/20 p-0">
                           <div className="px-8 py-4">
                             <p className="mb-3 text-sm font-medium text-muted-foreground">
-                              {directorate.name} Departmanlari:
+                              {directorate.name} Departmanları:
                             </p>
                             <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                               {directorate.departments.map((dept) => (
@@ -260,9 +276,9 @@ export default function DashboardPage() {
                                   className="rounded-lg border border-border bg-card p-4 transition-shadow hover:shadow-sm"
                                 >
                                   <p className="font-medium text-foreground">{dept.name}</p>
-                                  <p className="mt-1 text-sm text-muted-foreground">
-                                    {dept.taskCount} gorev
-                                  </p>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                  {getDeptUniquePersonCount(dept)} Kişi
+                                </p>
                                 </div>
                               ))}
                             </div>

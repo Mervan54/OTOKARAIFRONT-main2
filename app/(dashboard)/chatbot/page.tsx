@@ -14,17 +14,17 @@ import { sendChatMessage } from "@/lib/api"
 import type { ChatMessage as ChatMessageType } from "@/lib/types"
 
 const csvFiles = [
-{ label: "IT", value: "IT.csv" },
-{ label: "Finans", value: "FINANS.csv" },
-{ label: "Genel", value: "GENEL.csv" },
-{ label: "HR", value: "HR.csv" },
-{ label: "Kalite", value: "KALITE.csv" },
-{ label: "Satinalma", value: "SATINALMA.csv" },
-{ label: "Satis", value: "SATIS.csv" },
-{ label: "Ticari", value: "TICARI.csv" },
-{ label: "Uretim", value: "URETIM.csv" },
+  { label: "Askeri", value: "Askeri.csv" },
+  { label: "BT", value: "BT.csv" },
+  { label: "Finans", value: "Finans.csv" },
+  { label: "Genel", value: "Genel.csv" },
+  { label: "İnsan Kaynakları", value: "İnsanKaynakları.csv" },
+  { label: "Kalite", value: "Kalite.csv" },
+  { label: "Satın Alma", value: "SatınAlma.csv" },
+  { label: "Satış", value: "Satış.csv" },
+  { label: "Ticari Araçlar", value: "TicariAraçlar.csv" },
+  { label: "Üretim", value: "Üretim.csv" },
 ]
-
 const suggestedQuestions = [
 "En cok tekrar eden gorevler nelerdir?",
 "Hangi isler RPA ile yapilabilir?",
@@ -71,7 +71,7 @@ setInput("")
 setIsLoading(true)
 
 try {
-const response = await sendChatMessage(messageText, selectedFile)
+const response = await sendChatMessage(messageText, selectedFile || undefined)
 const assistantMessage: ChatMessageType = {
 id: `assistant-${Date.now()}`,
 role: "assistant",

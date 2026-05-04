@@ -44,7 +44,7 @@ function DepartmentCard({ dept, onAnalyze, isAnalyzing }: {
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <CardTitle className="text-base">{dept.name}</CardTitle>
-              <Badge className="mt-2">{dept.taskCount} gorev</Badge>
+              <Badge className="mt-2">{dept.taskCount} Görev</Badge>
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -239,7 +239,7 @@ export default function DirectorateDetailPage({ params }: PageProps) {
 
   return (
     <div>
-      <AppHeader title={directorate.name} description="Direktorluk detaylari ve departmanlar" />
+      <AppHeader title={directorate.name} description="Direktörlük Detayları ve Departmanlar" />
       <div className="p-6">
         <Link href="/directorates">
           <Button variant="ghost" className="mb-6">
@@ -250,7 +250,7 @@ export default function DirectorateDetailPage({ params }: PageProps) {
 
         <div className="grid gap-6 md:grid-cols-3">
           <StatCard
-            title="Toplam Kayit"
+            title="Toplam Kayıt"
             value={directorate.totalRecords}
             icon={ListTodo}
           />
@@ -260,7 +260,7 @@ export default function DirectorateDetailPage({ params }: PageProps) {
             icon={Users}
           />
           <StatCard
-            title="Toplam Gorev"
+            title="Toplam Görev"
             value={totalTasks}
             icon={Briefcase}
           />
@@ -273,7 +273,7 @@ export default function DirectorateDetailPage({ params }: PageProps) {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Sparkles className="h-4 w-4 text-primary" />
-                  AI Analiz Sonuclari
+                  AI Analiz Sonuçları
                 </CardTitle>
                 <Button
                   variant="ghost"
