@@ -149,9 +149,9 @@ Kapat
 <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-primary/5">
 <Bot className="h-10 w-10 text-primary" />
 </div>
-<h2 className="mt-6 text-2xl font-semibold">Gorev Analizi Asistani</h2>
+<h2 className="mt-6 text-2xl font-semibold">Görev Analizi Asistanı</h2>
 <p className="mt-2 max-w-md text-center text-muted-foreground">
-Once bir birim secin, sonra o birimle ilgili sorularinizi sorun.
+Önce bir birim seçin, o birimle ilgili sorularınızı sorun.
 </p>
 <div className="mt-8 flex flex-wrap justify-center gap-2">
 {suggestedQuestions.map((question) => (
@@ -226,7 +226,7 @@ className="shrink-0"
 </Button>
 </div>
 <p className="mt-3 text-center text-xs text-muted-foreground">
-Yanitlar secilen birimin gorev analizi verilerine dayanarak uretilmektedir.
+Yanıtlar seçilen birimin görev analizi verilerine dayanarak üretilmektedir. AI hata yapabilir. Lütfen kritik kararlar için doğrulama yapın.
 </p>
 </div>
 </CardContent>

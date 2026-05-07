@@ -60,12 +60,14 @@ export interface AIInsight {
 export interface AIAnalysisTask {
   task: string
   departments: string[]
-  bestSolution: SolutionType
+  bestSolution: string
   automationRate: number
   recommendation: string
-  projectIdea?: string
-  similarProjectName?: string
-  similarProjectLink?: string
+  projectIdea: string
+  similarProjectName: string
+  similarProjectLink: string
+  projectIdeas?: { task: string; projectIdea: string; similarProjectName: string; similarProjectLink: string  }[]
+  responsiblePeople?: { name: string; department: string; reason: string }[]
 }
 
 export interface AIAnalysisResponse {

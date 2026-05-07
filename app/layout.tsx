@@ -7,8 +7,8 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'Gorev Analiz Sistemi',
-  description: 'Kurumsal gorev analizi ve direktorluk yonetim sistemi',
+  title: 'Görev Analiz Sistemi',
+  description: 'Kurumsal görev analizi ve direktorluk yönetim sistemi',
   generator: 'v0.app',
   icons: {
     icon: [
