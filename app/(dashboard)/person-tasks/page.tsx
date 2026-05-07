@@ -13,7 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { createPortal } from "react-dom"
 import { getPersonAiAnalysis } from "@/lib/api"
 
-const API_BASE = "http://localhost:5091/api/Analysis"
+//const API_BASE = "http://localhost:5091/api/Analysis"
+const API_BASE = process.env.NEXT_PUBLIC_API_URL!
 const PAGE_SIZE = 12
 
 interface PersonTask {
