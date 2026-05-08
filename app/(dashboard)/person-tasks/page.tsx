@@ -14,8 +14,8 @@ import { createPortal } from "react-dom"
 import { getPersonAiAnalysis } from "@/lib/api"
 
 //const API_BASE = "http://localhost:5091/api/Analysis"
-const API_BASE = process.env.NEXT_PUBLIC_API_URL!
-const PAGE_SIZE = 12
+const API_BASE ="https://dmz.otokar.com.tr/GorevTnAPI/swagger/index.html"
+const PAGE_SIZE = 16
 
 interface PersonTask {
   sicilNo: string
@@ -33,31 +33,25 @@ interface PersonGroup {
   gorevler: string[]
 }
 
-function cleanMarkdown(text: string): string {
-  return text.replace(/\*\*/g, "").replace(/\*/g, "")
+function getCardColorClass(rate: number): string {
+  if (rate >= 70) return "bg-red-50 border-red-300"
+  if (rate >= 60) return "bg-green-50 border-green-300"
+  if (rate >= 50) return "bg-blue-100 border-blue-400"
+  return "bg-blue-50 border-blue-200"
 }
 
-function parseOtomasyonOrani(text: string): number | null {
-  const lines = text.split("\n")
-  const numbers: number[] = []
-  lines.forEach(line => {
-    const cleaned = cleanMarkdown(line)
-    if (
-      cleaned.toLowerCase().includes("genel") ||
-      cleaned.toLowerCase().includes("ortalama") ||
-      cleaned.toLowerCase().includes("toplam") ||
-      cleaned.toLowerCase().includes("sonuç")
-    ) return
-    const match = cleaned.match(/(%\d+|\d+%)/g)
-    if (match) {
-      match.forEach(m => {
-        const n = parseInt(m.replace("%", ""))
-        if (n > 0 && n <= 100) numbers.push(n)
-      })
-    }
-  })
-  if (numbers.length === 0) return null
-  return Math.round(numbers.reduce((a, b) => a + b, 0) / numbers.length)
+function getCardTextClass(rate: number): string {
+  if (rate >= 70) return "text-red-900"
+  if (rate >= 60) return "text-green-900"
+  if (rate >= 50) return "text-blue-900"
+  return "text-blue-800"
+}
+
+function getBadgeClass(rate: number): string {
+  if (rate >= 70) return "bg-red-100 text-red-800 hover:bg-red-100"
+  if (rate >= 60) return "bg-green-100 text-green-800 hover:bg-green-100"
+  if (rate >= 50) return "bg-blue-200 text-blue-900 hover:bg-blue-200"
+  return "bg-blue-100 text-blue-800 hover:bg-blue-100"
 }
 
 function parseGorevMaddeler(gorev: string): string[] {
@@ -72,24 +66,6 @@ function parseGorevMaddeler(gorev: string): string[] {
   return [gorev]
 }
 
-function parseProjeOnerileri(aiText: string): { name: string; link: string }[] {
-  const results: { name: string; link: string }[] = []
-  const lines = cleanMarkdown(aiText).split("\n")
-  lines.forEach(line => {
-    if (line.toLowerCase().includes("benzer proje")) {
-      const linkMatch = line.match(/https?:\/\/[^\s]+/)
-      const nameMatch = line.match(/benzer proje[:\s]+([^-\n]+)/i)
-      if (linkMatch) {
-        results.push({
-          name: nameMatch ? nameMatch[1].trim() : "Benzer Proje",
-          link: linkMatch[0]
-        })
-      }
-    }
-  })
-  return results
-}
-
 function findSharedPersons(madde: string, currentPerson: PersonGroup, allPersons: PersonGroup[]): PersonGroup[] {
   const key = madde.trim().toLowerCase().slice(0, 40)
   if (key.length < 10) return []
@@ -102,7 +78,6 @@ function findSharedPersons(madde: string, currentPerson: PersonGroup, allPersons
   }).slice(0, 4)
 }
 
-// Yeni AI response tipini parse et
 function parsePersonAiResult(data: any) {
   return {
     averageRate: data.averageAiAutomationRate ?? 0,
@@ -110,6 +85,21 @@ function parsePersonAiResult(data: any) {
     taskAnalyses: data.taskAnalyses ?? [],
     fromCache: data.fromCache ?? false,
   }
+}
+
+// Görev maddesiyle proje önerisini eşleştir
+function findRelatedTask(projectTask: string, gorevler: string[]): string | null {
+  if (!projectTask) return null
+  const key = projectTask.toLowerCase().slice(0, 40)
+  for (const gorev of gorevler) {
+    const maddeler = parseGorevMaddeler(gorev)
+    for (const madde of maddeler) {
+      if (madde.toLowerCase().includes(key.slice(0, 25)) || key.includes(madde.toLowerCase().slice(0, 25))) {
+        return madde.slice(0, 80)
+      }
+    }
+  }
+  return null
 }
 
 function PersonPopup({
@@ -130,7 +120,6 @@ function PersonPopup({
         }`}
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-center justify-between p-4 border-b shrink-0">
           <div>
             <h3 className="font-semibold text-base">{person.adSoyad}</h3>
@@ -141,7 +130,7 @@ function PersonPopup({
           </div>
           <div className="flex items-center gap-2">
             {aiData && (
-              <Badge className="bg-purple-100 text-purple-700">
+              <Badge className={getBadgeClass(aiData.averageRate)}>
                 %{aiData.averageRate} Otomasyon
               </Badge>
             )}
@@ -213,7 +202,7 @@ function PersonPopup({
             </div>
           </div>
 
-          {/* AI Analiz Sonucu - Yeni Format */}
+          {/* AI Analiz Sonucu */}
           {aiData && (
             <div>
               <h4 className="text-sm font-semibold mb-2 text-muted-foreground flex items-center gap-1">
@@ -221,37 +210,60 @@ function PersonPopup({
                 AI Analiz Sonucu
               </h4>
 
-              {/* Genel Yorum */}
               {aiData.generalComment && (
                 <div className="rounded-lg bg-primary/5 border border-primary/20 p-3 mb-3">
                   <p className="text-xs text-muted-foreground leading-relaxed">{aiData.generalComment}</p>
                 </div>
               )}
 
-              {/* Görev Bazlı Analizler */}
               <div className="space-y-3">
-                {aiData.taskAnalyses.map((t: any, i: number) => (
-                  <div key={i} className="rounded-lg border p-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-xs font-medium text-muted-foreground line-clamp-2">{t.task}</p>
-                      <div className="flex items-center gap-1 shrink-0 ml-2">
-                        <Badge variant="outline" className="text-xs">
-                          {t.bestSolution}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">%{t.aiAutomationRate}</span>
+                {aiData.taskAnalyses.map((t: any, i: number) => {
+                  const relatedTask = findRelatedTask(t.task, person.gorevler)
+                  return (
+                    <div key={i} className="rounded-lg border p-3">
+                      <div className="flex items-start justify-between mb-1 gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-muted-foreground line-clamp-2">{t.task}</p>
+                          {relatedTask && (
+                            <p className="text-xs text-primary/60 mt-0.5 line-clamp-1">
+                              📎 İlgili madde: {relatedTask}...
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Badge variant="outline" className="text-xs whitespace-nowrap">{t.bestSolution}</Badge>
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">%{t.aiAutomationRate}</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-2">{t.recommendation}</p>
+                      {t.projectIdea && (
+                        <p className="text-xs text-blue-600 mb-1">💡 {t.projectIdea}</p>
+                      )}
+                      {t.similarProjectName && (
+                        <div className="flex items-center gap-1 mt-1">
+                          {t.similarProjectLink ? (
+                            <a
+                              href={t.similarProjectLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-xs text-primary hover:underline"
+                            >
+                              <ExternalLink className="h-3 w-3 shrink-0" />
+                              {t.similarProjectName}
+                            </a>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">🔗 {t.similarProjectName}</span>
+                          )}
+                        </div>
+                      )}
+                      <div className="mt-2 flex items-center gap-2">
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                          <div className="h-full bg-primary transition-all" style={{ width: `${t.aiAutomationRate}%` }} />
+                        </div>
                       </div>
                     </div>
-                    <p className="text-xs text-muted-foreground mb-1">{t.recommendation}</p>
-                    {t.projectIdea && (
-                      <p className="text-xs text-blue-600">💡 {t.projectIdea}</p>
-                    )}
-                    <div className="mt-2 flex items-center gap-2">
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                        <div className="h-full bg-primary transition-all" style={{ width: `${t.aiAutomationRate}%` }} />
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )}
@@ -269,6 +281,8 @@ function PersonCard({
   canAnalyze,
   onAnalyze,
   aiData,
+  forceOpen,
+  onPopupClose,
 }: {
   person: PersonGroup
   allPersons: PersonGroup[]
@@ -276,39 +290,48 @@ function PersonCard({
   canAnalyze: boolean
   onAnalyze: () => void
   aiData: any | null
+  forceOpen?: boolean
+  onPopupClose?: () => void
 }) {
   const [showPopup, setShowPopup] = useState(false)
   const toplamMadde = person.gorevler.reduce((acc, g) => acc + parseGorevMaddeler(g).length, 0)
   const MAX_GOREV = 3
 
+  useEffect(() => {
+    if (forceOpen) setShowPopup(true)
+  }, [forceOpen])
+
+  const cardBg = aiData ? getCardColorClass(aiData.averageRate) : ""
+  const cardText = aiData ? getCardTextClass(aiData.averageRate) : ""
+
   return (
     <>
-      <Card className="flex flex-col">
-        <CardHeader className="pb-2">
-          <div className="flex items-start justify-between">
-            <div className="min-w-0 flex-1">
-              <CardTitle className="text-base truncate">{person.adSoyad}</CardTitle>
-              <div className="mt-1">
-                <DepartmentBadge name={person.mudurluk} />
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">{person.birim}</p>
-            </div>
-            <div className="flex flex-col items-end gap-1 ml-2 shrink-0">
-              <Badge variant="secondary">{toplamMadde} Görev</Badge>
-              {aiData && (
-                <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100 text-xs">
-                  %{aiData.averageRate} AI
-                </Badge>
-              )}
-            </div>
-          </div>
-        </CardHeader>
+      <Card className={`flex flex-col border ${aiData ? cardBg : ""}`}>
+  <CardHeader className="pb-2">
+  <div className="flex items-start gap-2">
+    <div className="min-w-0 flex-1">
+      <CardTitle className={`text-sm truncate ${cardText}`}>{person.adSoyad}</CardTitle>
+      <div className="mt-1">
+        <DepartmentBadge name={person.mudurluk} />
+      </div>
+      <p className={`mt-1 text-xs truncate ${aiData ? cardText + " opacity-70" : "text-muted-foreground"}`}>{person.birim}</p>
+    </div>
+  </div>
+  <div className="flex gap-1 mt-2 flex-wrap">
+    <Badge variant="secondary" className="text-xs">{toplamMadde} Görev</Badge>
+    {aiData && (
+      <Badge className={`text-xs ${getBadgeClass(aiData.averageRate)}`}>
+        %{aiData.averageRate} AI
+      </Badge>
+    )}
+  </div>
+</CardHeader>
         <CardContent className="flex-1 flex flex-col gap-3">
           <div className="space-y-1.5 overflow-hidden">
             {person.gorevler.slice(0, MAX_GOREV).map((gorev, i) => {
               const maddeler = parseGorevMaddeler(gorev)
               return (
-                <div key={i} className="flex gap-2 text-xs text-muted-foreground">
+                <div key={i} className={`flex gap-2 text-xs ${aiData ? cardText + " opacity-80" : "text-muted-foreground"}`}>
                   <span className="text-primary shrink-0 font-bold mt-0.5">{i + 1}.</span>
                   <span className="line-clamp-2">
                     {maddeler.length > 1 ? `${maddeler[0].slice(0, 80)}...` : gorev.slice(0, 80)}{gorev.length > 80 ? "..." : ""}
@@ -318,7 +341,7 @@ function PersonCard({
             })}
             {person.gorevler.length > MAX_GOREV && (
               <button onClick={() => setShowPopup(true)} className="text-xs text-primary hover:underline ml-4">
-                +{person.gorevler.length - MAX_GOREV} görev daha — tümünü gör
+                +{person.gorevler.length - MAX_GOREV} görev daha
               </button>
             )}
           </div>
@@ -327,22 +350,21 @@ function PersonCard({
             <Button
               variant="outline"
               size="sm"
-              className="flex-1"
+              className="flex-1 text-xs"
               onClick={onAnalyze}
               disabled={isAnalyzing || !canAnalyze || !!aiData}
-              title={!canAnalyze && !isAnalyzing ? "Başka bir analiz devam ediyor" : ""}
             >
               {isAnalyzing ? (
-                <><Loader2 className="mr-1 h-3 w-3 animate-spin" /> Analiz ediliyor...</>
+                <><Loader2 className="mr-1 h-3 w-3 animate-spin" /> Analiz...</>
               ) : aiData ? (
-                <><Sparkles className="mr-1 h-3 w-3" /> Tamamlandı</>
+                <><Sparkles className="mr-1 h-3 w-3" /> Tamam</>
               ) : !canAnalyze ? (
                 <><Loader2 className="mr-1 h-3 w-3" /> Bekliyor...</>
               ) : (
                 <><Sparkles className="mr-1 h-3 w-3" /> AI Analiz</>
               )}
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowPopup(true)}>
+            <Button variant="outline" size="sm" className="text-xs" onClick={() => setShowPopup(true)}>
               Detay
             </Button>
           </div>
@@ -354,7 +376,10 @@ function PersonCard({
           person={person}
           aiData={aiData}
           allPersons={allPersons}
-          onClose={() => setShowPopup(false)}
+          onClose={() => {
+            setShowPopup(false)
+            onPopupClose?.()
+          }}
         />
       )}
     </>
@@ -370,6 +395,7 @@ export default function PersonTasksPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [analyzingPersonKey, setAnalyzingPersonKey] = useState<string | null>(null)
   const [aiResults, setAiResults] = useState<Record<string, any>>({})
+  const [openPopupKey, setOpenPopupKey] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchData() {
@@ -441,6 +467,29 @@ export default function PersonTasksPage() {
     currentPage * PAGE_SIZE
   )
 
+  useEffect(() => {
+    async function fetchPageAnalyses() {
+      const toFetch = paginatedPersons.filter(p =>
+        p.sicilNo && !aiResults[`${p.adSoyad}-${p.mudurluk}`]
+      )
+      await Promise.all(
+        toFetch.map(async (person) => {
+          try {
+            const data = await getPersonAiAnalysis(person.sicilNo)
+            const parsed = parsePersonAiResult(data)
+            const key = `${person.adSoyad}-${person.mudurluk}`
+            setAiResults(prev => ({ ...prev, [key]: parsed }))
+          } catch {
+            // Analiz yoksa sessizce geç
+          }
+        })
+      )
+    }
+    if (paginatedPersons.length > 0 && !loading) {
+      fetchPageAnalyses()
+    }
+  }, [paginatedPersons, loading])
+
   const handleBirimChange = (val: string) => {
     setSelectedBirim(val)
     setSelectedDept("all")
@@ -448,15 +497,11 @@ export default function PersonTasksPage() {
   }
 
   const handleAnalyze = async (person: PersonGroup) => {
-  const key = `${person.adSoyad}-${person.mudurluk}`
-  if (analyzingPersonKey !== null || aiResults[key]) return
+    const key = `${person.adSoyad}-${person.mudurluk}`
+    if (analyzingPersonKey !== null || aiResults[key]) return
 
-  console.log("SicilNo:", person.sicilNo) // bunu ekle
-  
-  setAnalyzingPersonKey(key)
-  
+    setAnalyzingPersonKey(key)
     try {
-      // Önce index-all-csv çalıştır
       try {
         await fetch(`${API_BASE}/index-all-csv`, { method: "POST" })
       } catch { }
@@ -464,6 +509,7 @@ export default function PersonTasksPage() {
       const data = await getPersonAiAnalysis(person.sicilNo)
       const parsed = parsePersonAiResult(data)
       setAiResults(prev => ({ ...prev, [key]: parsed }))
+      setOpenPopupKey(key)
     } catch (err) {
       console.error("Kişi analizi hatası:", err)
     } finally {
@@ -475,8 +521,8 @@ export default function PersonTasksPage() {
     return (
       <div>
         <AppHeader title="Kişi Görev Analizi" description="Kişi bazlı görev ve otomasyon analizi" />
-        <div className="p-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-64 w-full" />)}
+        <div className="p-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map(i => <Skeleton key={i} className="h-64 w-full" />)}
         </div>
       </div>
     )
@@ -540,7 +586,7 @@ export default function PersonTasksPage() {
           </div>
         )}
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           {paginatedPersons.map((person) => {
             const key = `${person.adSoyad}-${person.mudurluk}`
             return (
@@ -552,6 +598,8 @@ export default function PersonTasksPage() {
                 canAnalyze={analyzingPersonKey === null}
                 onAnalyze={() => handleAnalyze(person)}
                 aiData={aiResults[key] ?? null}
+                forceOpen={openPopupKey === key}
+                onPopupClose={() => setOpenPopupKey(null)}
               />
             )
           })}
@@ -568,7 +616,7 @@ export default function PersonTasksPage() {
         {filteredPersons.length > 0 && (
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
-              Sayfa {currentPage} / {totalPages} — Toplam {filteredPersons.length} kişi
+              Sayfa {currentPage} / {totalPages} 
             </p>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>

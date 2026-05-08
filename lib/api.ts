@@ -1,4 +1,5 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL!
+//const API_BASE = process.env.NEXT_PUBLIC_API_URL!
+const API_BASE ="https://dmz.otokar.com.tr/GorevTnAPI/swagger/index.html"
 //const API_BASE = "http://localhost:5091/api/Analysis"
 
 const nameMapping: Record<string, string> = {
@@ -39,6 +40,13 @@ export async function getDirectorateSummary() {
       adSoyadlar: dept.adSoyadlar ?? [],
     })),
   }))
+}
+export async function getDirectorateTaskAnalysis(directorate: string) {
+  const backendDirectorate = reverseNameMapping[directorate] ?? directorate
+  const response = await fetch(`${API_BASE}/directorate/${encodeURIComponent(backendDirectorate)}/tasks/ai-analysis`)
+  if (!response.ok) throw new Error("Direktörlük görev analizi alınamadı")
+  const data = await response.json()
+  return data
 }
 
 // Direktörlüğe göre AI analizi
