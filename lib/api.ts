@@ -1,5 +1,5 @@
 //const API_BASE = process.env.NEXT_PUBLIC_API_URL!
-const API_BASE ="https://dmz.otokar.com.tr/GorevTnAPI/swagger/index.html"
+const API_BASE ="https://dmz.otokar.com.tr/GorevTnAPI"
 //const API_BASE = "http://localhost:5091/api/Analysis"
 
 const nameMapping: Record<string, string> = {
