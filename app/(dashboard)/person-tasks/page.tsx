@@ -14,7 +14,7 @@ import { createPortal } from "react-dom"
 import { getPersonAiAnalysis } from "@/lib/api"
 
 //const API_BASE = "http://localhost:5091/api/Analysis"
-const API_BASE ="https://dmz.otokar.com.tr/GorevTnAPI"
+const API_BASE ="https://dmz.otokar.com.tr/GorevTnAPI/api/Analysis"
 const PAGE_SIZE = 16
 
 interface PersonTask {
