@@ -423,3 +423,7 @@
 //     </div>
 //   )
 // }
+
+export default function ReportsPage() {
+  return null
+}
