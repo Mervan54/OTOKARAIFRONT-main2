@@ -55,7 +55,7 @@ export default function DashboardPage() {
     .length
 
   const chartData = directorates.map((d) => ({
-    name: d.name.replace(" Direktorlugu", "").replace(" Direktörlüğü", ""),
+    name: d.name.replace(" Direktörlugu", "").replace(" Direktörlüğü", ""),
     value: [...new Set(d.departments.flatMap(dept => dept.adSoyadlar ?? []))].length,
   }))
 

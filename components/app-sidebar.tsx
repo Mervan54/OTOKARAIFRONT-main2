@@ -9,9 +9,9 @@ import { useState, useEffect } from "react"
 const navigation = [
   { name: "Genel Bakış", href: "/", icon: LayoutDashboard },
   { name: "Direktörlükler", href: "/directorates", icon: Building2 },
-  { name: "Görevler", href: "/tasks", icon: ListTodo },
+ // { name: "Görevler", href: "/tasks", icon: ListTodo },
   { name: "Kişi Görev Analizi", href: "/person-tasks", icon: Users },
-  { name: "Raporlar ve İstatistikler", href: "/reports", icon: BarChart2 },
+ //{ name: "Raporlar ve İstatistikler", href: "/reports", icon: BarChart2 },
   { name: "Yapay Zeka Asistan", href: "/chatbot", icon: MessageSquare },
 ]
 

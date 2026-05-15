@@ -30,6 +30,7 @@ export interface UniqueTask {
   name: string
   departments: string[]
   persons: string[]
+  birim? : string
   frequency: number
   solutionType: SolutionType
   automationRate: number

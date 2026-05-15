@@ -1,23 +1,29 @@
-//const API_BASE = process.env.NEXT_PUBLIC_API_URL!
-const API_BASE ="https://dmz.otokar.com.tr/GorevTnAPI/api/Analysis"
+const API_BASE = process.env.NEXT_PUBLIC_API_URL!
+//const API_BASE ="https://dmz.otokar.com.tr/GorevTnAPI/swagger/index.html"
 //const API_BASE = "http://localhost:5091/api/Analysis"
 
 const nameMapping: Record<string, string> = {
-  "BT": "Bilgi Teknolojileri",
-  "ASKERI": "Askeri Araçlar",
+  "BT": "BT",
+  "ASKERI": "Askeri",
   "FINANS": "Finans",
-  "GENEL": "Genel Müdürlük",
-  "İnsanKaynakları": "İnsan Kaynakları",
+  "Genel": "Genel Müdürlük",
+  "İnsanKaynakları": "İnsanKaynakları",
   "KALITE": "Kalite",
-  "SatınAlma": "Satın Alma",
+  "Satın Alma": "Satın Alma",
   "Satış": "Satış",
-  "TicariAraçlar": "Ticari Araçlar",
+  "Ticari Araçlar": "Ticari Araçlar",
   "Üretim": "Üretim",
 }
 
 const reverseNameMapping: Record<string, string> = Object.fromEntries(
   Object.entries(nameMapping).map(([k, v]) => [v, k])
 )
+//SON DİREKTÖRLÜK VERİLERİ BURADAN GELİYOR .....
+export async function getDirectorateAiResult(directorate: string) { 
+  const response = await fetch(`${API_BASE}/directorate-ai/${encodeURIComponent(directorate)}`)
+  if (!response.ok) return null
+  return response.json()
+}
 
 // Direktörlük özetleri
 export async function getDirectorateSummary() {
@@ -62,6 +68,7 @@ export async function getAIAnalysis(directorate: string, department?: string) {
   const data = await response.json()
 
   const analysis = data.analysis ?? data
+  
 
   // projectIdeas array olarak geliyor (yeni format)
   const projectIdeas = Array.isArray(analysis.projectIdeas)
@@ -114,7 +121,7 @@ export async function getUniqueTasks() {
   if (!response.ok) throw new Error("Görev verileri alınamadı")
   const data = await response.json()
 
-  const taskMap = new Map<string, { name: string; departments: string[]; persons: string[] }>()
+  const taskMap = new Map<string, { name: string; departments: string[]; persons: string[]; birim: string }>()
 
   data.forEach((record: any) => {
     if (!record.anaSorumluluk) return
@@ -138,6 +145,7 @@ export async function getUniqueTasks() {
         name: record.anaSorumluluk.trim(),
         departments: dept ? [dept] : [],
         persons: person ? [person] : [],
+        birim: record.birim?.trim() ?? "",
       })
     }
   })
@@ -147,6 +155,7 @@ export async function getUniqueTasks() {
     name: value.name,
     departments: value.departments,
     persons: value.persons,
+    birim: value.birim, 
     frequency: value.persons.length,
     solutionType: "Other" as const,
     automationRate: 0,
@@ -161,8 +170,19 @@ export async function getCsvFiles(): Promise<string[]> {
   return await response.json()
 }
 
-// Chatbota soru gönder
-export async function sendChatMessage(question: string, fileName?: string): Promise<string> {
+// Chatbota soru gönder //DBDEKI KISIMLAR ESLESMESI ICIN FONKSIYON EKLEDIK ORNEK Kerem Çelik -> KEREM CELIK
+function normalizeName(name: string): string {
+  return name
+    .toUpperCase()
+    .trim()
+}
+
+export async function sendChatMessage(
+  question: string,
+  fileName?: string,
+  mudurluk?: string,
+  kisi?: string
+): Promise<string> {
   try {
     await fetch(`${API_BASE}/index-all-csv`, { method: "POST" })
   } catch {
@@ -170,14 +190,17 @@ export async function sendChatMessage(question: string, fileName?: string): Prom
   }
 
   const response = await fetch(`${API_BASE}/chatbot-ask`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      question,
-      fileName: fileName ?? null
-    }),
-  })
-
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    question: kisi
+      ? `${normalizeName(kisi)} için: ${question}`
+      : question,
+    fileName: fileName ?? null,
+    mudurluk: mudurluk ?? null,
+    personName: kisi ? normalizeName(kisi) : null,
+  }),
+})
   if (!response.ok) throw new Error("Chatbot yanıt veremedi")
 
   const text = await response.text()
@@ -278,9 +301,13 @@ export async function getSentenceBasedTasks() {
       name: value.sentence,
       departments: value.departments,
       persons: value.persons,
+      birim: undefined,
       frequency: value.persons.length,
       solutionType: "Other" as const,
       automationRate: 0,
       recommendation: "",
+      
     }))
+
 }
+

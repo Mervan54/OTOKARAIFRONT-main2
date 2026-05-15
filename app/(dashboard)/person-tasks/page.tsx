@@ -13,8 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { createPortal } from "react-dom"
 import { getPersonAiAnalysis } from "@/lib/api"
 
-//const API_BASE = "http://localhost:5091/api/Analysis"
-const API_BASE ="https://dmz.otokar.com.tr/GorevTnAPI/api/Analysis"
+const API_BASE = process.env.NEXT_PUBLIC_API_URL!
+//const API_BASE="http://localhost:5091/api/Analysis"
 const PAGE_SIZE = 16
 
 interface PersonTask {
@@ -34,35 +34,31 @@ interface PersonGroup {
 }
 
 function getCardColorClass(rate: number): string {
-  if (rate >= 70) return "bg-red-50 border-red-300"
-  if (rate >= 60) return "bg-green-50 border-green-300"
-  if (rate >= 50) return "bg-blue-100 border-blue-400"
-  return "bg-blue-50 border-blue-200"
+  if (rate >= 70) return "bg-green-200 border-green-500"
+  if (rate >= 60) return "bg-green-100 border-green-400"
+  if (rate >= 50) return "bg-green-50 border-green-300"
+  return "bg-green-50 border-green-300"
 }
 
 function getCardTextClass(rate: number): string {
-  if (rate >= 70) return "text-red-900"
-  if (rate >= 60) return "text-green-900"
-  if (rate >= 50) return "text-blue-900"
-  return "text-blue-800"
+  if (rate >= 70) return "text-green-900"
+  if (rate >= 60) return "text-green-800"
+  if (rate >= 50) return "text-green-700"
+  return "text-green-700"
 }
 
 function getBadgeClass(rate: number): string {
-  if (rate >= 70) return "bg-red-100 text-red-800 hover:bg-red-100"
-  if (rate >= 60) return "bg-green-100 text-green-800 hover:bg-green-100"
-  if (rate >= 50) return "bg-blue-200 text-blue-900 hover:bg-blue-200"
-  return "bg-blue-100 text-blue-800 hover:bg-blue-100"
+  if (rate >= 70) return "bg-green-300 text-green-900 hover:bg-green-300"
+  if (rate >= 60) return "bg-green-200 text-green-900 hover:bg-green-200"
+  if (rate >= 50) return "bg-green-100 text-green-800 hover:bg-green-100"
+  return "bg-green-100 text-green-800 hover:bg-green-100"
 }
 
 function parseGorevMaddeler(gorev: string): string[] {
-  const numbered = gorev.split(/\d+\.\s+/).map(s => s.trim()).filter(s => s.length > 5)
-  if (numbered.length > 1) return numbered
-  const bulleted = gorev.split(/[•\-\*]\s+/).map(s => s.trim()).filter(s => s.length > 5)
-  if (bulleted.length > 1) return bulleted
-  const commaed = gorev.split(/,\s+(?=[A-ZÇĞİÖŞÜa-zçğışöşü])/).map(s => s.trim()).filter(s => s.length > 10)
-  if (commaed.length > 2) return commaed
-  const sentences = gorev.split(/\.\s+(?=[A-ZÇĞİÖŞÜ])/).map(s => s.trim()).filter(s => s.length > 10)
-  if (sentences.length > 1) return sentences
+  if (gorev.includes("¤")) {
+    const parts = gorev.split("¤").map(s => s.trim()).filter(s => s.length > 2)
+    if (parts.length > 1) return parts
+  }
   return [gorev]
 }
 
@@ -87,20 +83,15 @@ function parsePersonAiResult(data: any) {
   }
 }
 
-// Görev maddesiyle proje önerisini eşleştir
-function findRelatedTask(projectTask: string, gorevler: string[]): string | null {
-  if (!projectTask) return null
-  const key = projectTask.toLowerCase().slice(0, 40)
-  for (const gorev of gorevler) {
-    const maddeler = parseGorevMaddeler(gorev)
-    for (const madde of maddeler) {
-      if (madde.toLowerCase().includes(key.slice(0, 25)) || key.includes(madde.toLowerCase().slice(0, 25))) {
-        return madde.slice(0, 80)
-      }
-    }
-  }
-  return null
+// ✅ Otomasyon oranına göre renk
+
+ function getPairColor(rate: number): { border: string; bg: string; num: string } {
+  if (rate >= 70) return { border: "border-l-green-500", bg: "bg-green-200", num: "bg-green-200 text-green-900" }
+  if (rate >= 60) return { border: "border-l-green-400", bg: "bg-green-100", num: "bg-green-100 text-green-800" }
+  if (rate >= 50) return { border: "border-l-green-300", bg: "bg-green-50", num: "bg-green-50 text-green-700" }
+  return { border: "border-l-green-200", bg: "bg-green-50", num: "bg-green-50 text-green-600" }
 }
+
 
 function PersonPopup({
   person, aiData, allPersons, onClose
@@ -150,8 +141,11 @@ function PersonPopup({
             <div className="space-y-3">
               {person.gorevler.map((gorev, gi) => {
                 const maddeler = parseGorevMaddeler(gorev)
-                return (
-                  <div key={gi} className="rounded-lg border p-3">
+                // AI analizindeki aynı index'in oranına göre renk
+  
+               return (
+ 
+                <div key={gi} className="rounded-lg border p-3">
                     {maddeler.length > 1 ? (
                       <ul className="space-y-2">
                         {maddeler.map((madde, mi) => {
@@ -218,47 +212,43 @@ function PersonPopup({
 
               <div className="space-y-3">
                 {aiData.taskAnalyses.map((t: any, i: number) => {
-                  const relatedTask = findRelatedTask(t.task, person.gorevler)
+                  const color = getPairColor(t.aiAutomationRate)
                   return (
-                    <div key={i} className="rounded-lg border p-3">
-                      <div className="flex items-start justify-between mb-1 gap-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-muted-foreground line-clamp-2">{t.task}</p>
-                          {relatedTask && (
-                            <p className="text-xs text-primary/60 mt-0.5 line-clamp-1">
-                              📎 İlgili madde: {relatedTask}...
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <Badge variant="outline" className="text-xs whitespace-nowrap">{t.bestSolution}</Badge>
-                          <span className="text-xs text-muted-foreground whitespace-nowrap">%{t.aiAutomationRate}</span>
+                    <div key={i} className="flex gap-2">
+                      <div className="shrink-0 flex flex-col items-center pt-1">
+                        <div className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${color.num}`}>
+                          {i + 1}
                         </div>
                       </div>
-                      <p className="text-xs text-muted-foreground mb-2">{t.recommendation}</p>
-                      {t.projectIdea && (
-                        <p className="text-xs text-blue-600 mb-1">💡 {t.projectIdea}</p>
-                      )}
-                      {t.similarProjectName && (
-                        <div className="flex items-center gap-1 mt-1">
-                          {t.similarProjectLink ? (
-                            <a
-                              href={t.similarProjectLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1 text-xs text-primary hover:underline"
-                            >
-                              <ExternalLink className="h-3 w-3 shrink-0" />
-                              {t.similarProjectName}
-                            </a>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">🔗 {t.similarProjectName}</span>
-                          )}
+                      <div className={`flex-1 rounded-lg border-l-4 border p-3 ${color.border} ${color.bg}`}>
+                        <div className="flex items-start justify-between mb-1 gap-2">
+                          <p className="text-xs font-medium text-muted-foreground line-clamp-2 flex-1">{t.task}</p>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Badge variant="outline" className="text-xs whitespace-nowrap">{t.bestSolution}</Badge>
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">%{t.aiAutomationRate}</span>
+                          </div>
                         </div>
-                      )}
-                      <div className="mt-2 flex items-center gap-2">
-                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                          <div className="h-full bg-primary transition-all" style={{ width: `${t.aiAutomationRate}%` }} />
+                        <p className="text-xs text-muted-foreground mb-2">{t.recommendation}</p>
+                        {t.projectIdea && (
+                          <div className="mb-1">
+                            <p className="text-xs text-blue-600">💡 {t.projectIdea}</p>
+                            {t.projectLink && t.projectLink !== "" && (
+                              <a
+                                href={t.projectLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-xs text-primary hover:underline mt-0.5"
+                              >
+                                <ExternalLink className="h-3 w-3 shrink-0" />
+                                {t.projectLink}
+                              </a>
+                            )}
+                          </div>
+                        )}
+                        <div className="mt-2 flex items-center gap-2">
+                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                            <div className="h-full bg-primary transition-all" style={{ width: `${t.aiAutomationRate}%` }} />
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -307,25 +297,25 @@ function PersonCard({
   return (
     <>
       <Card className={`flex flex-col border ${aiData ? cardBg : ""}`}>
-  <CardHeader className="pb-2">
-  <div className="flex items-start gap-2">
-    <div className="min-w-0 flex-1">
-      <CardTitle className={`text-sm truncate ${cardText}`}>{person.adSoyad}</CardTitle>
-      <div className="mt-1">
-        <DepartmentBadge name={person.mudurluk} />
-      </div>
-      <p className={`mt-1 text-xs truncate ${aiData ? cardText + " opacity-70" : "text-muted-foreground"}`}>{person.birim}</p>
-    </div>
-  </div>
-  <div className="flex gap-1 mt-2 flex-wrap">
-    <Badge variant="secondary" className="text-xs">{toplamMadde} Görev</Badge>
-    {aiData && (
-      <Badge className={`text-xs ${getBadgeClass(aiData.averageRate)}`}>
-        %{aiData.averageRate} AI
-      </Badge>
-    )}
-  </div>
-</CardHeader>
+        <CardHeader className="pb-2">
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <CardTitle className={`text-sm truncate ${cardText}`}>{person.adSoyad}</CardTitle>
+              <div className="mt-1">
+                <DepartmentBadge name={person.mudurluk} />
+              </div>
+              <p className={`mt-1 text-xs truncate ${aiData ? cardText + " opacity-70" : "text-muted-foreground"}`}>{person.birim}</p>
+            </div>
+          </div>
+          <div className="flex gap-1 mt-2 flex-wrap">
+            <Badge variant="secondary" className="text-xs">{toplamMadde} Görev</Badge>
+            {aiData && (
+              <Badge className={`text-xs ${getBadgeClass(aiData.averageRate)}`}>
+                %{aiData.averageRate} AI
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
         <CardContent className="flex-1 flex flex-col gap-3">
           <div className="space-y-1.5 overflow-hidden">
             {person.gorevler.slice(0, MAX_GOREV).map((gorev, i) => {
@@ -347,13 +337,7 @@ function PersonCard({
           </div>
 
           <div className="flex gap-2 mt-auto">
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1 text-xs"
-              onClick={onAnalyze}
-              disabled={isAnalyzing || !canAnalyze || !!aiData}
-            >
+            <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={onAnalyze} disabled={isAnalyzing || !canAnalyze || !!aiData}>
               {isAnalyzing ? (
                 <><Loader2 className="mr-1 h-3 w-3 animate-spin" /> Analiz...</>
               ) : aiData ? (
@@ -437,12 +421,16 @@ export default function PersonTasksPage() {
   }, [allRecords])
 
   const birims = useMemo(() => {
-    return [...new Set(personGroups.map(p => p.birim).filter(Boolean))].sort()
+    return [...new Set(personGroups.map(p => p.birim).filter(Boolean))].sort((a, b) =>
+      a.localeCompare(b, "tr", { sensitivity: "base" })
+    )
   }, [personGroups])
 
   const departments = useMemo(() => {
     const filtered = selectedBirim === "all" ? personGroups : personGroups.filter(p => p.birim === selectedBirim)
-    return [...new Set(filtered.map(p => p.mudurluk).filter(Boolean))].sort()
+    return [...new Set(filtered.map(p => p.mudurluk).filter(Boolean))].sort((a, b) =>
+      a.localeCompare(b, "tr", { sensitivity: "base" })
+    )
   }, [personGroups, selectedBirim])
 
   const filteredPersons = useMemo(() => {
@@ -528,7 +516,6 @@ export default function PersonTasksPage() {
     )
   }
 
-  const totalPersons = new Set(personGroups.map(p => p.adSoyad)).size
   const totalDepts = new Set(personGroups.map(p => p.mudurluk)).size
 
   return (
@@ -539,7 +526,9 @@ export default function PersonTasksPage() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="rounded-lg border bg-card p-4">
             <p className="text-sm text-muted-foreground">Toplam Çalışan</p>
-            <p className="mt-1 text-3xl font-bold text-primary">{totalPersons}</p>
+            <p className="mt-1 text-3xl font-bold text-primary">
+              {new Set(filteredPersons.map(p => p.adSoyad)).size}
+            </p>
           </div>
           <div className="rounded-lg border bg-card p-4">
             <p className="text-sm text-muted-foreground">Toplam Departman</p>
@@ -554,7 +543,9 @@ export default function PersonTasksPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Tüm Birimler</SelectItem>
-              {birims.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+              {["Askeri", "BT", "Finans", "Genel", "İnsanKaynakları", "Kalite", "SatınAlma", "Satış", "TicariAraçlar", "Üretim"].map(b => (
+                <SelectItem key={b} value={b}>{b}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
 
@@ -616,7 +607,7 @@ export default function PersonTasksPage() {
         {filteredPersons.length > 0 && (
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
-              Sayfa {currentPage} / {totalPages} 
+              Sayfa {currentPage} / {totalPages}
             </p>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>

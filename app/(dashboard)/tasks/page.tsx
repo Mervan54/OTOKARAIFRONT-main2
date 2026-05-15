@@ -1,4 +1,4 @@
-"use client"
+/*"use client" İstek Üzerine Sayfa Kaldırıldı.
 
 import { useState, useEffect, useMemo } from "react"
 import { Search, ArrowUpDown, ListTodo, ChevronLeft, ChevronRight, Maximize2, Minimize2 } from "lucide-react"
@@ -20,17 +20,29 @@ type SortField = "name" | "frequency"
 type SortDirection = "asc" | "desc"
 
 const PAGE_SIZE = 20
+//const API_BASE = process.env.NEXT_PUBLIC_API_URL 
+const API_BASE = "http://localhost:5091/api/Analysis"
+
+const birimMap: Record<string, string> = {
+  "Bilgi Teknolojileri": "BT",
+  "Askeri Araçlar": "ASKERI",
+  "Finans": "FINANS",
+  "Genel Müdürlük": "GENEL",
+  "İnsan Kaynakları": "İnsanKaynakları",
+  "Kalite": "KALITE",
+  "Satın Alma": "SatınAlma",
+  "Satış": "Satış",
+  "Ticari Araçlar": "TicariAraçlar",
+  "Üretim": "Üretim",
+}
 
 function parseGorevMaddeler(gorev: string): string[] {
   const numbered = gorev.split(/\d+\.\s+/).map(s => s.trim()).filter(s => s.length > 5)
   if (numbered.length > 1) return numbered
-
   const bulleted = gorev.split(/[•\-\*]\s+/).map(s => s.trim()).filter(s => s.length > 5)
   if (bulleted.length > 1) return bulleted
-
   const sentences = gorev.split(/\.\s+(?=[A-ZÇĞİÖŞÜ])/).map(s => s.trim()).filter(s => s.length > 10)
   if (sentences.length > 1) return sentences
-
   return [gorev]
 }
 
@@ -80,10 +92,7 @@ function TaskRow({ task }: { task: UniqueTask }) {
       </TableRow>
 
       {showPopup && typeof window !== "undefined" && createPortal(
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-          onClick={() => setShowPopup(false)}
-        >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowPopup(false)}>
           <div
             className={`bg-white dark:bg-gray-900 rounded-xl shadow-2xl border flex flex-col transition-all duration-200 ${
               isMaximized ? "w-full h-full rounded-none" : "w-full max-w-2xl mx-4 max-h-[85vh]"
@@ -104,8 +113,8 @@ function TaskRow({ task }: { task: UniqueTask }) {
                 {parseGorevMaddeler(task.name).map((madde, i) => (
                   <li key={i} className="text-sm text-muted-foreground leading-relaxed flex gap-2">
                     <span className="text-primary font-bold shrink-0">{i + 1}.</span>
-                    <span>{madde.trim().replace(/^[-•]\s*/, "")}</span>
-                  </li>
+                    <span>{madde.trim().replace(/^[-•]\s*/ /* , "")}</span>
+                /* </li>
                 ))}
               </ul>
               <div className="border-t pt-4">
@@ -134,6 +143,7 @@ function TaskRow({ task }: { task: UniqueTask }) {
 export default function TasksPage() {
   const [tasks, setTasks] = useState<UniqueTask[]>([])
   const [directorates, setDirectorates] = useState<Directorate[]>([])
+  const [rawRecords, setRawRecords] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [sortField, setSortField] = useState<SortField>("name")
@@ -144,12 +154,14 @@ export default function TasksPage() {
 
   useEffect(() => {
     async function fetchData() {
-      const [data, dirs] = await Promise.all([
+      const [data, dirs, raw] = await Promise.all([
         getUniqueTasks(),
-        getDirectorateSummary()
+        getDirectorateSummary(),
+        fetch(`${API_BASE}/raw`).then(r => r.json())
       ])
       setTasks(data)
       setDirectorates(dirs)
+      setRawRecords(raw)
       setLoading(false)
     }
     fetchData()
@@ -165,6 +177,19 @@ export default function TasksPage() {
     return dir ? dir.departments.map(d => d.name).sort() : []
   }, [directorates, selectedBirim])
 
+  // Raw veriden filtrelenmiş kişi sayısı — person-tasks sayfasıyla aynı mantık
+  const filteredPersonCount = useMemo(() => {
+    let records = rawRecords
+    if (selectedBirim !== "all") {
+      const backendBirim = birimMap[selectedBirim] ?? selectedBirim
+      records = records.filter((r: any) => r.birim === backendBirim)
+    }
+    if (selectedDept !== "all") {
+      records = records.filter((r: any) => r.mudurluk === selectedDept)
+    }
+    return new Set(records.map((r: any) => r.ad_soyad).filter(Boolean)).size
+  }, [rawRecords, selectedBirim, selectedDept])
+
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc")
@@ -178,21 +203,17 @@ export default function TasksPage() {
   const filteredAndSortedTasks = useMemo(() => {
     let result = [...tasks]
 
-    // Birim filtresi
     if (selectedBirim !== "all") {
-      const dir = directorates.find(d => d.name === selectedBirim)
-      const deptPersons = new Set(dir?.departments.flatMap(d => d.adSoyadlar ?? []) ?? [])
-      result = result.filter(t => t.persons.some(p => deptPersons.has(p)))
+      const backendBirim = birimMap[selectedBirim] ?? selectedBirim
+      result = result.filter(t => t.birim === backendBirim)
     }
 
-    // Departman filtresi
     if (selectedDept !== "all") {
       const dept = directorates.flatMap(d => d.departments).find(d => d.name === selectedDept)
       const deptPersons = new Set(dept?.adSoyadlar ?? [])
       result = result.filter(t => t.persons.some(p => deptPersons.has(p)))
     }
 
-    // Arama filtresi
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
       result = result.filter(t =>
@@ -236,21 +257,16 @@ export default function TasksPage() {
   return (
     <div>
       <AppHeader title="Görevler" description="Departmanlar Arası Görev Analizi" />
-      <div className="p-6">
-        <div className="mb-6 grid gap-4 sm:grid-cols-2">
-          <div className="rounded-lg border bg-card p-4">
-            <p className="text-sm text-muted-foreground">Toplam Görev</p>
-            <p className="mt-1 text-2xl font-semibold">
-              {new Set(tasks.flatMap(t => t.persons)).size}
-            </p>
-          </div>
-          <div className="rounded-lg border bg-card p-4">
-            <p className="text-sm text-muted-foreground">Filtrelenen</p>
-            <p className="mt-1 text-2xl font-semibold">
-              {new Set(filteredAndSortedTasks.flatMap(t => t.persons)).size}
-            </p>
-          </div>
-        </div>
+      <div className="mb-6 grid gap-4 sm:grid-cols-2">
+  <div className="rounded-lg border bg-card p-4">
+    <p className="text-sm text-muted-foreground">Toplam Çalışan</p>
+    <p className="mt-1 text-2xl font-semibold">{filteredPersonCount}</p>
+  </div>
+  <div className="rounded-lg border bg-card p-4">
+    <p className="text-sm text-muted-foreground">Filtrelenen</p>
+    <p className="mt-1 text-2xl font-semibold">{filteredPersonCount}</p>
+  </div>
+</div>
 
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
           <Select value={selectedBirim} onValueChange={(val) => { setSelectedBirim(val); setSelectedDept("all"); setCurrentPage(1) }}>
@@ -290,7 +306,7 @@ export default function TasksPage() {
 
           <div className="flex items-center gap-2 text-sm text-muted-foreground shrink-0">
             <ListTodo className="h-4 w-4" />
-            <span>{new Set(filteredAndSortedTasks.flatMap(t => t.persons)).size} kişi bulundu</span>
+            <span>{filteredPersonCount} kişi bulundu</span>
           </div>
         </div>
 
@@ -325,7 +341,7 @@ export default function TasksPage() {
 
                 <div className="mt-4 flex items-center justify-between">
                   <p className="text-sm text-muted-foreground">
-                    Sayfa {currentPage} / {totalPages} — {new Set(filteredAndSortedTasks.flatMap(t => t.persons)).size} Kişi
+                    Sayfa {currentPage} / {totalPages} — {filteredPersonCount} Kişi
                   </p>
                   <div className="flex items-center gap-2">
                     <Button variant="outline" size="sm" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>
@@ -343,6 +359,6 @@ export default function TasksPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+   
   )
-}
+}*/
